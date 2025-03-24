@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>Admin Dashboard - Flower Shop</title>
-  <link href="assets/css/admin.css" rel="stylesheet">
+  <link href="/assets/css/admin.css" rel="stylesheet">
 </head>
 <body>
   <header class="navbar navbar-dark bg-primary px-3">
