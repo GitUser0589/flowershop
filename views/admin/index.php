@@ -1,3 +1,23 @@
+<?php
+// Include Database Connection
+require_once '../../dB/config.php';
+
+// Fetch Inventory Data
+$sqlInventory = "SELECT flowerID, flower_name, price, quantity FROM flowers;";
+$resultInventory = $conn->query($sqlInventory);
+
+$inventory = [];
+if ($resultInventory) {
+    while ($row = $resultInventory->fetch_assoc()) {
+        $inventory[] = $row;
+    }
+}
+
+
+// Close Connection
+$conn->close();
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,72 +35,102 @@
   <main class="container py-4">
     <h2 class="text-center">Welcome, Admin!</h2>
     
-    <div class="row">
-      <!-- Orders Section -->
-      <div class="col-md-6">
-        <h3>Recent Orders</h3>
-        <ul class="list-group" id="orders-list">
-          <li class="list-group-item">No recent orders</li>
-        </ul>
-      </div>
-      
-      <!-- Inventory Section -->
-      <div class="col-md-6">
-        <h3>Manage Inventory</h3>
-        <button class="btn btn-success mb-3" onclick="addFlower()">Add New Flower</button>
-        <ul class="list-group" id="inventory-list">
-          <li class="list-group-item">No flowers in inventory</li>
-        </ul>
+    <!-- Inventory Section -->
+<div class="col-md-6">
+    <h3>Manage Inventory</h3>
+    <button class="btn btn-success mb-3" onclick="addFlower()">Add New Flower</button>
+    <ul class="list-group" id="inventory-list">
+        <?php if (!empty($inventory)): ?>
+            <?php foreach ($inventory as $item): ?>
+                <li class="list-group-item d-flex justify-content-between">
+                    <?php echo "₱" . number_format($item['price'], 2) . " - " . htmlspecialchars($item['flower_name']) . " - Stock: " . (int)$item['quantity']; ?>
+                    <div>
+                        <button class="btn btn-warning btn-sm" onclick="increaseStock(<?php echo (int)$item['flowerID']; ?>, <?php echo (int)$item['quantity']; ?>)">Add Stock</button>
+                        <button class="btn btn-danger btn-sm" onclick="removeItem(<?php echo (int)$item['flowerID']; ?>, <?php echo (int)$item['quantity']; ?>)">Remove</button>
+                    </div>
+                </li>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <li class="list-group-item">No flowers in inventory</li>
+        <?php endif; ?>
+    </ul>
+</div>
+
       </div>
     </div>
   </main>
-  
+
   <script>
-    const orders = [
-      { id: 1, customer: "John Doe", item: "Roses", quantity: 5 },
-      { id: 2, customer: "Jane Smith", item: "Lilies", quantity: 3 }
-    ];
-    const inventory = [
-      { id: 1, name: "Roses", stock: 20 },
-      { id: 2, name: "Lilies", stock: 15 }
-    ];
-    
-    function displayOrders() {
-      const ordersList = document.getElementById("orders-list");
-      ordersList.innerHTML = "";
-      orders.forEach(order => {
-        ordersList.innerHTML += `<li class="list-group-item">${order.customer} ordered ${order.quantity} ${order.item}</li>`;
-      });
-      if (orders.length === 0) ordersList.innerHTML = "<li class='list-group-item'>No recent orders</li>";
-    }
-    
-    function displayInventory() {
-      const inventoryList = document.getElementById("inventory-list");
-      inventoryList.innerHTML = "";
-      inventory.forEach(item => {
-        inventoryList.innerHTML += `<li class="list-group-item d-flex justify-content-between">${item.name} - Stock: ${item.stock} <button class="btn btn-danger btn-sm" onclick="removeItem(${item.id})">Remove</button></li>`;
-      });
-      if (inventory.length === 0) inventoryList.innerHTML = "<li class='list-group-item'>No flowers in inventory</li>";
-    }
-    
     function addFlower() {
-      const flowerName = prompt("Enter flower name:");
-      if (flowerName) {
-        inventory.push({ id: inventory.length + 1, name: flowerName, stock: 10 });
-        displayInventory();
-      }
+    const flowerName = prompt("Enter flower name:");
+    if (!flowerName) return;
+
+    const price = parseFloat(prompt("Enter price of the flower:"));
+    if (isNaN(price) || price <= 0) {
+        alert("Please enter a valid price.");
+        return;
     }
-    
-    function removeItem(id) {
-      const index = inventory.findIndex(item => item.id === id);
-      if (index !== -1) {
-        inventory.splice(index, 1);
-        displayInventory();
-      }
+
+    const quantity = parseInt(prompt("Enter quantity:"));
+    if (isNaN(quantity) || quantity < 0) {
+        alert("Please enter a valid quantity.");
+        return;
     }
-    
-    displayOrders();
-    displayInventory();
+
+    fetch("/controller/addFlower.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flower_name: flowerName, price, quantity })
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        if (data.status === "success") location.reload(); // Refresh inventory
+    })
+    .catch(error => console.error("Error:", error));
+}
+function removeItem(flowerID, currentStock) {
+    const quantityToRemove = parseInt(prompt(`Enter quantity to remove (Stock: ${currentStock}):`));
+
+    if (isNaN(quantityToRemove) || quantityToRemove <= 0 || quantityToRemove > currentStock) {
+        alert("Invalid quantity. Please enter a number between 1 and " + currentStock);
+        return;
+    }
+
+    fetch("/controller/removeFlower.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flowerID, quantity: quantityToRemove })
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        if (data.status === "success") location.reload();
+    })
+    .catch(error => console.error("Error:", error));
+}
+function increaseStock(flowerID, currentStock) {
+    const quantityToAdd = parseInt(prompt(`Enter quantity to add (Current Stock: ${currentStock}):`));
+
+    if (isNaN(quantityToAdd) || quantityToAdd <= 0) {
+        alert("Invalid quantity. Please enter a number greater than 0.");
+        return;
+    }
+
+    fetch("/controller/increaseStock.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flowerID, quantity: quantityToAdd })
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(data.message);
+        if (data.status === "success") location.reload();
+    })
+    .catch(error => console.error("Error:", error));
+}
+
+
   </script>
 </body>
 </html>
